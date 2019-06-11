@@ -53,7 +53,7 @@ public class Client {
 			f.sync();
 			// wait until close
 			f.channel().closeFuture().sync();
-			System.out.println("�Ѿ��˳�");
+			System.out.println("connection closed!");
 		} catch (Exception e) {
 			e.printStackTrace();
 		} finally {
@@ -61,7 +61,8 @@ public class Client {
 		}
 	}
 	
-	public void send(TankJoinMsg msg) {
+	public void send(Msg msg) {
+		System.out.println("SEND:" + msg);
 		channel.writeAndFlush(msg);
 	}
 
@@ -76,20 +77,19 @@ class ClientChannelInitializer extends ChannelInitializer<SocketChannel> {
 	@Override
 	protected void initChannel(SocketChannel ch) throws Exception {
 		ch.pipeline()
-			.addLast(new TankJoinMsgEncoder())
-			.addLast(new TankJoinMsgDecoder())
+			.addLast(new MsgEncoder())
+			.addLast(new MsgDecoder())
 			.addLast(new ClientHandler());
 	}
 
 }
 
-class ClientHandler extends SimpleChannelInboundHandler<TankJoinMsg> {
+class ClientHandler extends SimpleChannelInboundHandler<Msg> {
 
 	@Override
-	public void channelRead0(ChannelHandlerContext ctx, TankJoinMsg msg) throws Exception {
+	public void channelRead0(ChannelHandlerContext ctx, Msg msg) throws Exception {
+		System.out.println(msg);
 		msg.handle();
-		
-
 	}
 
 	@Override

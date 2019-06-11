@@ -6,6 +6,8 @@ import java.awt.Rectangle;
 import java.util.Random;
 import java.util.UUID;
 
+import com.mashibing.tank.net.BulletNewMsg;
+import com.mashibing.tank.net.Client;
 import com.mashibing.tank.net.TankJoinMsg;
 
 public class Tank {
@@ -28,6 +30,13 @@ public class Tank {
 	private TankFrame tf = null;
 
 	private boolean living = true;
+	public boolean isLiving() {
+		return living;
+	}
+
+	public void setLiving(boolean living) {
+		this.living = living;
+	}
 	private Group group = Group.BAD;
 	public Tank(int x, int y, Dir dir, Group group, TankFrame tf) {
 		super();
@@ -42,6 +51,7 @@ public class Tank {
 		rect.width = WIDTH;
 		rect.height = HEIGHT;
 	}
+	
 	public Tank(TankJoinMsg msg) {
 		this.x = msg.x;
 		this.y = msg.y;
@@ -49,6 +59,11 @@ public class Tank {
 		this.moving = msg.moving;
 		this.group = msg.group;
 		this.id = msg.id;
+		
+		rect.x = this.x;
+		rect.y = this.y;
+		rect.width = WIDTH;
+		rect.height = HEIGHT;
 	}
 	
 	private void boundsCheck() {
@@ -60,12 +75,20 @@ public class Tank {
 	
 	public void die() {
 		this.living = false;
+		int eX = this.getX() + Tank.WIDTH/2 - Explode.WIDTH/2;
+		int eY = this.getY() + Tank.HEIGHT/2 - Explode.HEIGHT/2;
+		TankFrame.INSTANCE.explodes.add(new Explode(eX, eY));
 	}
+	
 	public void fire() {
 		int bX = this.x + Tank.WIDTH/2 - Bullet.WIDTH/2;
 		int bY = this.y + Tank.HEIGHT/2 - Bullet.HEIGHT/2;
 		
-		tf.bullets.add(new Bullet(bX, bY, this.dir, this.group, this.tf));
+		Bullet b = new Bullet(this.id, bX, bY, this.dir, this.group, this.tf);
+		
+		tf.bullets.add(b);
+		
+		Client.INSTANCE.send(new BulletNewMsg(b));
 		
 		if(this.group == Group.GOOD) new Thread(()->new Audio("audio/tank_fire.wav").play()).start();
 	}
@@ -94,8 +117,12 @@ public class Tank {
 	}
 
 	private void move() {
+		if(!living) return;
 		
 		if(!moving) return ;
+		
+		//save the oldDir for TankDirChangedMsg
+		//oldDir = dir;
 		
 		switch (dir) {
 		case LEFT:
@@ -126,12 +153,23 @@ public class Tank {
 	}
 
 	public void paint(Graphics g) {
-		if(!living) tf.tanks.remove(this);
 		//uuid on head
 		Color c = g.getColor();
 		g.setColor(Color.YELLOW);
-		g.drawString(id.toString(), this.x, this.y - 10);
+		g.drawString(id.toString(), this.x, this.y - 20);
+		g.drawString("live=" + living, x, y-10);
 		g.setColor(c);
+		
+		//draw a rect if dead!
+		if(!living) {
+			moving = false;
+			Color cc = g.getColor();
+			g.setColor(Color.WHITE);
+			g.drawRect(x, y, WIDTH, HEIGHT);
+			g.setColor(cc);
+			return;
+		}
+		
 		
 		switch(dir) {
 		case LEFT:
@@ -149,6 +187,8 @@ public class Tank {
 		}
 	
 		move();
+		
+
 	
 	}
 	

@@ -9,11 +9,18 @@ import java.awt.event.KeyEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Random;
 import java.util.UUID;
+
+import com.mashibing.tank.net.Client;
+import com.mashibing.tank.net.TankDirChangedMsg;
+import com.mashibing.tank.net.TankStartMovingMsg;
+import com.mashibing.tank.net.TankStopMsg;
 
 public class TankFrame extends Frame {
 	public static final TankFrame INSTANCE = new TankFrame();
@@ -28,12 +35,25 @@ public class TankFrame extends Frame {
 	
 	static final int GAME_WIDTH = 1080, GAME_HEIGHT = 960;
 	
+	public void addBullet(Bullet b) {
+		bullets.add(b);
+	}
+	
 	public void addTank(Tank t) {
 		tanks.put(t.getId(), t);
 	}
 	
-	public Tank findByUUID(UUID id) {
+	public Tank findTankByUUID(UUID id) {
 		return tanks.get(id);
+	}
+	
+	public Bullet findBulletByUUID(UUID id) {
+		for(int i=0; i<bullets.size(); i++) {
+			if(bullets.get(i).getId().equals(id)) 
+				return bullets.get(i);
+		}
+		
+		return null;
 	}
 
 	private TankFrame() {
@@ -91,10 +111,10 @@ public class TankFrame extends Frame {
 			explodes.get(i).paint(g);
 		}
 		//collision detect 
-
+		Collection<Tank> values = tanks.values();
 		for(int i=0; i<bullets.size(); i++) {
-			for(int j = 0; j<tanks.size(); j++) 
-				bullets.get(i).collideWith(tanks.get(j));
+			for(Tank t : values ) 
+				bullets.get(i).collideWith(t);
 		}
 		
 		
@@ -120,25 +140,30 @@ public class TankFrame extends Frame {
 		@Override
 		public void keyPressed(KeyEvent e) {
 			int key = e.getKeyCode();
+
 			switch (key) {
 			case KeyEvent.VK_LEFT:
 				bL = true;
+				setMainTankDir();
 				break;
 			case KeyEvent.VK_UP:
 				bU = true;
+				setMainTankDir();
 				break;
 			case KeyEvent.VK_RIGHT:
 				bR = true;
+				setMainTankDir();
 				break;
 			case KeyEvent.VK_DOWN:
 				bD = true;
+				setMainTankDir();
 				break;
 
 			default:
 				break;
 			}
 
-			setMainTankDir();
+			
 			
 			new Thread(()->new Audio("audio/tank_move.wav").play()).start();
 		}
@@ -146,18 +171,23 @@ public class TankFrame extends Frame {
 		@Override
 		public void keyReleased(KeyEvent e) {
 			int key = e.getKeyCode();
+			
 			switch (key) {
 			case KeyEvent.VK_LEFT:
 				bL = false;
+				setMainTankDir();
 				break;
 			case KeyEvent.VK_UP:
 				bU = false;
+				setMainTankDir();
 				break;
 			case KeyEvent.VK_RIGHT:
 				bR = false;
+				setMainTankDir();
 				break;
 			case KeyEvent.VK_DOWN:
 				bD = false;
+				setMainTankDir();
 				break;
 
 			case KeyEvent.VK_CONTROL:
@@ -168,15 +198,17 @@ public class TankFrame extends Frame {
 				break;
 			}
 
-			setMainTankDir();
+			
 		}
 
 		private void setMainTankDir() {
+			//save the old dir
+			Dir dir = myTank.getDir();
 
-			if (!bL && !bU && !bR && !bD)
+			if (!bL && !bU && !bR && !bD) {
 				myTank.setMoving(false);
-			else {
-				myTank.setMoving(true);
+				Client.INSTANCE.send(new TankStopMsg(getMainTank()));
+			} else {
 
 				if (bL)
 					myTank.setDir(Dir.LEFT);
@@ -186,7 +218,18 @@ public class TankFrame extends Frame {
 					myTank.setDir(Dir.RIGHT);
 				if (bD)
 					myTank.setDir(Dir.DOWN);
+				//发出坦克移动的消息
+				if(!myTank.isMoving())
+					Client.INSTANCE.send(new TankStartMovingMsg(getMainTank()));
+				
+				myTank.setMoving(true);
+				
+				if(dir != myTank.getDir()) {
+					Client.INSTANCE.send(new TankDirChangedMsg(myTank));
+				}
 			}
+			
+			
 		}
 	}
 
